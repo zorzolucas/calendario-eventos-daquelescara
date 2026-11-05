@@ -1,0 +1,6 @@
+{
+  "name": "calendario-eventos",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" }
+}
