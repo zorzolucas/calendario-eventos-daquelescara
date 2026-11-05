@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendário de Eventos</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
+<style>
+:root{
+  --bg:#f6f5f2; --card:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e3e1dc;
+  --accent:#2f6fde; --accent-soft:#e6eefc; --good:#1f8f4e; --good-soft:#e3f5ea;
+  --warn:#b4570f; --danger:#c43b3b;
+  --manha:#f2b640; --tarde:#e8743b; --noite:#5a5fd6;
+  --radius:12px; --shadow:0 1px 2px rgba(0,0,0,.05),0 2px 8px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141416; --card:#1e1e21; --ink:#ececee; --muted:#9a9aa2; --line:#303034;
+    --accent:#6c9cff; --accent-soft:#1f2a42; --good:#4cc47f; --good-soft:#1a3326;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141416; --card:#1e1e21; --ink:#ececee; --muted:#9a9aa2; --line:#303034;
+  --accent:#6c9cff; --accent-soft:#1f2a42; --good:#4cc47f; --good-soft:#1a3326;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+button{cursor:pointer;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 11px}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+button.ghost:hover{color:var(--ink);background:var(--accent-soft)}
+button.danger:hover{color:var(--danger);border-color:var(--danger)}
+button.small{padding:3px 8px;font-size:13px}
+a{color:var(--accent)}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+header h1{font-size:19px;margin:0;display:flex;gap:8px;align-items:center}
+header .tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+header select{width:auto;min-width:170px}
+main{display:grid;grid-template-columns:340px 1fr;gap:18px;padding:18px 20px;max-width:1500px;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr;padding:14px 16px}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px}
+.side{display:flex;flex-direction:column;gap:18px;align-self:start;position:sticky;top:12px}
+@media (max-width:900px){.side{position:static}}
+h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.muted{color:var(--muted)} .tiny{font-size:12px}
+/* calendar */
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+.cal .dow{font-size:11px;color:var(--muted);padding:3px 0;text-transform:uppercase}
+.cal .d{aspect-ratio:1;border-radius:8px;border:1px solid transparent;background:none;padding:0;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:14px;position:relative}
+.cal .d.out{opacity:.35}
+.cal .d.today{border-color:var(--line);font-weight:600}
+.cal .d.sel{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+.cal .d .dots{display:flex;gap:2px;position:absolute;bottom:4px}
+.cal .d .dots i{width:5px;height:5px;border-radius:50%}
+/* tree */
+.tree{display:flex;flex-direction:column;gap:14px}
+.day{border:1px solid var(--line);border-radius:var(--radius);background:var(--card);box-shadow:var(--shadow)}
+.day>.dhead{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.day>.dhead .t{font-weight:600;flex:1;min-width:160px;display:flex;gap:8px;align-items:center}
+.caret{border:none;background:none;padding:2px 4px;font-size:12px;color:var(--muted);transition:transform .15s}
+.collapsed .caret{transform:rotate(-90deg)}
+.collapsed>.dbody{display:none}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border-radius:999px;padding:4px 11px;font-size:13px;border:1px solid var(--line);background:none}
+.chip.on{color:#1d1d1f;font-weight:600}
+.chip.on.manha{background:var(--manha);border-color:var(--manha)}
+.chip.on.tarde{background:var(--tarde);border-color:var(--tarde)}
+.chip.on.noite{background:var(--noite);border-color:var(--noite);color:#fff}
+.dbody{padding:12px 14px;display:flex;flex-direction:column;gap:14px}
+.period{border-left:4px solid var(--c);padding-left:12px}
+.period>.phead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.period>.phead b{font-size:14px}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg)}
+.opt.chosen{border-color:var(--good);box-shadow:0 0 0 1px var(--good)}
+.ohead{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ohead input.title{flex:1;min-width:160px;font-weight:600}
+.places{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin-top:10px}
+.place{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px;display:flex;flex-direction:column;gap:6px;position:relative}
+.place.fav{border-color:var(--good);background:var(--good-soft)}
+.place.nearest::after{content:"mais perto";position:absolute;top:-9px;right:10px;background:var(--good);color:#fff;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:600}
+.place input,.place textarea{padding:5px 7px;font-size:13.5px}
+.place input.name{font-weight:600}
+.place textarea{resize:vertical;min-height:34px}
+.place .row{display:flex;gap:6px}
+.place .acts{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.stars{display:flex;gap:1px}
+.stars button{border:none;background:none;padding:0 1px;font-size:16px;color:var(--line)}
+.stars button.on{color:#f0a500}
+.route{font-size:12.5px;background:var(--accent-soft);border-radius:6px;padding:3px 7px}
+.route.err{background:none;color:var(--danger)}
+.addplace{border:1px dashed var(--line);background:none;border-radius:10px;min-height:60px;color:var(--muted)}
+.empty{text-align:center;padding:40px 20px;color:var(--muted);border:1px dashed var(--line);border-radius:var(--radius)}
+.empty .big{font-size:36px}
+/* route calc */
+.rc label{display:block;font-size:12.5px;color:var(--muted);margin:8px 0 3px}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.modes button{font-size:13px;padding:6px 4px}
+.modes button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dest-list{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:2px}
+.dest-list label{display:flex;gap:6px;align-items:flex-start;margin:0;color:var(--ink);font-size:13px;padding:3px;border-radius:5px}
+.dest-list label:hover{background:var(--accent-soft)}
+.dest-list input{width:auto;margin-top:3px}
+.dest-list .grp{font-size:11px;color:var(--muted);text-transform:uppercase;margin-top:6px;padding:0 3px}
+.results{margin-top:10px;display:flex;flex-direction:column;gap:5px}
+.res{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13.5px}
+.res.best{border-color:var(--good);background:var(--good-soft)}
+.res .n{font-weight:600}
+.res .v{white-space:nowrap;text-align:right}
+.inline{display:flex;gap:6px}
+dialog{border:1px solid var(--line);border-radius:var(--radius);background:var(--card);color:var(--ink);max-width:520px;width:calc(100% - 32px);padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+dialog h3{margin:0 0 10px}
+dialog label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+dialog .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:10}
+.toast.show{opacity:1}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>📅 <span>Calendário de Eventos</span></h1>
+  <div class="tools">
+    <select id="eventSel" title="Evento"></select>
+    <button id="newEvent" title="Novo evento">+ Evento</button>
+    <button id="renameEvent" class="ghost" title="Renomear evento">✏️</button>
+    <button id="deleteEvent" class="ghost danger" title="Excluir evento">🗑️</button>
+    <button id="exportBtn" class="ghost" title="Exportar para compartilhar">⬇️ Exportar</button>
+    <button id="importBtn" class="ghost" title="Importar arquivo">⬆️ Importar</button>
+    <input type="file" id="importFile" accept="application/json,.json" class="hidden">
+    <button id="settingsBtn" class="ghost" title="Configurações">⚙️</button>
+  </div>
+</header>
+
+<main>
+  <aside class="side">
+    <section class="card">
+      <div class="cal-head">
+        <button class="ghost" id="prevM" aria-label="Mês anterior">‹</button>
+        <strong id="monthLbl"></strong>
+        <button class="ghost" id="nextM" aria-label="Próximo mês">›</button>
+      </div>
+      <div class="cal" id="cal"></div>
+      <p class="tiny muted" style="margin:10px 0 0">Clique nos dias para incluir ou tirar do evento.</p>
+    </section>
+
+    <section class="card rc" id="routeCard">
+      <h2>🧭 Calculadora de rota</h2>
+      <label for="origin">Saindo de</label>
+      <div class="inline">
+        <input id="origin" placeholder="Endereço, hotel, casa…">
+        <button id="geoBtn" title="Usar minha localização">📍</button>
+      </div>
+      <label>Como vamos</label>
+      <div class="modes" id="modes">
+        <button data-mode="TRANSIT">🚇 Transporte</button>
+        <button data-mode="WALK">🚶 A pé</button>
+        <button data-mode="DRIVE">🚗 Carro</button>
+      </div>
+      <label>Para onde (locais do evento)</label>
+      <div class="dest-list" id="destList"></div>
+      <label for="extraDest">Outros endereços (um por linha)</label>
+      <textarea id="extraDest" rows="2" placeholder="Ex.: Parque Ibirapuera, São Paulo"></textarea>
+      <div class="inline" style="margin-top:10px">
+        <button class="primary" id="calcBtn" style="flex:1">Qual é o mais perto?</button>
+      </div>
+      <div class="results" id="results"></div>
+      <p class="tiny muted hidden" id="noKeyHint" style="margin:8px 0 0">Sem chave do Google Maps configurada: dá para abrir cada rota no Maps, mas a comparação automática precisa da chave (⚙️).</p>
+    </section>
+  </aside>
+
+  <section>
+    <div class="tree" id="tree"></div>
+  </section>
+</main>
+
+<dialog id="settingsDlg">
+  <h3>⚙️ Configurações</h3>
+  <label for="apiKey">Chave da API do Google Maps</label>
+  <input id="apiKey" placeholder="AIza…" autocomplete="off">
+  <p class="tiny muted">Ative a <b>Routes API</b> no Google Cloud e, por segurança, restrinja a chave ao domínio do site (ex.: <code>*.vercel.app</code>). A chave fica salva só neste navegador.</p>
+  <label for="themeSel">Tema</label>
+  <select id="themeSel"><option value="">Automático</option><option value="light">Claro</option><option value="dark">Escuro</option></select>
+  <div class="foot">
+    <button id="closeSettings">Cancelar</button>
+    <button class="primary" id="saveSettings">Salvar</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- state ---------- */
+const STORE_KEY = 'calendario-eventos-v1';
+const SETTINGS_KEY = 'calendario-eventos-settings';
+const PERIODS = [
+  {id:'manha', label:'Manhã', icon:'🌅', color:'var(--manha)', hour:9},
+  {id:'tarde', label:'Tarde', icon:'☀️', color:'var(--tarde)', hour:14},
+  {id:'noite', label:'Noite', icon:'🌙', color:'var(--noite)', hour:19},
+];
+const MODE_URL = {TRANSIT:'transit', WALK:'walking', DRIVE:'driving'};
+
+const uid = () => Math.random().toString(36).slice(2,10);
+const safeGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
+const safeSet = (k,v) => { try { localStorage.setItem(k,v); } catch {} };
+
+function newEvent(name){
+  return {id:uid(), name, origin:'', mode:'TRANSIT', days:{}};
+}
+function load(){
+  try {
+    const s = JSON.parse(safeGet(STORE_KEY));
+    if (s && Array.isArray(s.events) && s.events.length) return s;
+  } catch {}
+  const ev = newEvent('Meu evento');
+  return {events:[ev], current:ev.id, collapsed:{}};
+}
+let state = load();
+let settings = (() => { try { return JSON.parse(safeGet(SETTINGS_KEY)) || {}; } catch { return {}; } })();
+let routeCache = {}; // placeId -> {text, seconds, meters, err}
+let nearestIds = new Set();
+let selectedDest = null; // Set of place ids for calculator (null = all)
+
+const ev = () => state.events.find(e => e.id === state.current) || state.events[0];
+const save = () => safeSet(STORE_KEY, JSON.stringify(state));
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2,'0');
+const isoOf = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseIso = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y,m-1,d); };
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const fmtDay = s => cap(parseIso(s).toLocaleDateString('pt-BR',{weekday:'long', day:'numeric', month:'long'}));
+const fmtShort = s => parseIso(s).toLocaleDateString('pt-BR',{weekday:'short', day:'2-digit', month:'2-digit'});
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200); }
+
+function ensureDay(iso){
+  const e = ev();
+  if (!e.days[iso]) e.days[iso] = {periods:{}};
+  return e.days[iso];
+}
+function findOption(iso, pid, oid){ return ev().days[iso]?.periods[pid]?.options.find(o => o.id === oid); }
+function findPlace(iso, pid, oid, plid){ return findOption(iso,pid,oid)?.places.find(p => p.id === plid); }
+function allPlaces(){
+  const out = [];
+  const e = ev();
+  for (const iso of Object.keys(e.days).sort()){
+    for (const p of PERIODS){
+      const per = e.days[iso].periods[p.id];
+      if (!per) continue;
+      for (const o of per.options) for (const pl of o.places){
+        if (pl.name || pl.address) out.push({iso, period:p, option:o, place:pl});
+      }
+    }
+  }
+  return out;
+}
+const placeQuery = pl => (pl.address || pl.name || '').trim();
+const mapsDirUrl = (origin, dest, mode) =>
+  'https://www.google.com/maps/dir/?api=1' + (origin ? '&origin='+encodeURIComponent(origin) : '') +
+  '&destination='+encodeURIComponent(dest) + '&travelmode='+MODE_URL[mode];
+const mapsSearchUrl = q => 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q);
+
+/* ---------- theme ---------- */
+function applyTheme(){ if (settings.theme) document.documentElement.dataset.theme = settings.theme; else delete document.documentElement.dataset.theme; }
+applyTheme();
+
+/* ---------- header ---------- */
+function renderHeader(){
+  const sel = $('#eventSel');
+  sel.innerHTML = state.events.map(e => `<option value="${e.id}" ${e.id===ev().id?'selected':''}>${esc(e.name)}</option>`).join('');
+}
+$('#eventSel').onchange = e => { state.current = e.target.value; routeCache={}; nearestIds=new Set(); selectedDest=null; save(); renderAll(); };
+$('#newEvent').onclick = () => {
+  const name = prompt('Nome do novo evento:', 'Viagem');
+  if (!name) return;
+  const e = newEvent(name.trim()); state.events.push(e); state.current = e.id; routeCache={}; nearestIds=new Set(); save(); renderAll();
+};
+$('#renameEvent').onclick = () => {
+  const name = prompt('Novo nome do evento:', ev().name);
+  if (!name) return; ev().name = name.trim(); save(); renderHeader();
+};
+$('#deleteEvent').onclick = () => {
+  if (!confirm(`Excluir o evento "${ev().name}" e tudo dentro dele?`)) return;
+  state.events = state.events.filter(e => e.id !== ev().id);
+  if (!state.events.length) state.events.push(newEvent('Meu evento'));
+  state.current = state.events[0].id; save(); renderAll();
+};
+$('#exportBtn').onclick = () => {
+  const blob = new Blob([JSON.stringify({version:1, event:ev()}, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (ev().name || 'evento').replace(/[^\w\-]+/g,'_') + '.json';
+  a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+};
+$('#importBtn').onclick = () => $('#importFile').click();
+$('#importFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    const imp = data.event || data;
+    if (!imp || typeof imp.days !== 'object') throw new Error('formato');
+    imp.id = uid(); imp.name = imp.name || f.name.replace(/\.json$/,'');
+    imp.mode = imp.mode || 'TRANSIT'; imp.origin = imp.origin || '';
+    state.events.push(imp); state.current = imp.id; save(); renderAll(); toast('Evento importado');
+  } catch { alert('Não consegui ler esse arquivo. Use um arquivo exportado por este app.'); }
+  e.target.value = '';
+};
+
+/* ---------- settings ---------- */
+$('#settingsBtn').onclick = () => { $('#apiKey').value = settings.apiKey || ''; $('#themeSel').value = settings.theme || ''; $('#settingsDlg').showModal(); };
+$('#closeSettings').onclick = () => $('#settingsDlg').close();
+$('#saveSettings').onclick = () => {
+  settings.apiKey = $('#apiKey').value.trim(); settings.theme = $('#themeSel').value;
+  safeSet(SETTINGS_KEY, JSON.stringify(settings)); applyTheme(); $('#settingsDlg').close(); renderRoute(); toast('Configurações salvas');
+};
+
+/* ---------- calendar ---------- */
+let viewMonth = (() => { const ks = Object.keys(ev().days).sort(); const d = ks.length ? parseIso(ks[0]) : new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })();
+$('#prevM').onclick = () => { viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth()-1, 1); renderCal(); };
+$('#nextM').onclick = () => { viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth()+1, 1); renderCal(); };
+
+function renderCal(){
+  $('#monthLbl').textContent = cap(viewMonth.toLocaleDateString('pt-BR',{month:'long', year:'numeric'}));
+  const dows = ['D','S','T','Q','Q','S','S'];
+  const first = new Date(viewMonth);
+  const start = new Date(first); start.setDate(1 - first.getDay());
+  const today = isoOf(new Date());
+  let h = dows.map(d => `<div class="dow">${d}</div>`).join('');
+  for (let i=0;i<42;i++){
+    const d = new Date(start); d.setDate(start.getDate()+i);
+    const iso = isoOf(d); const day = ev().days[iso];
+    const cls = ['d'];
+    if (d.getMonth() !== viewMonth.getMonth()) cls.push('out');
+    if (iso === today) cls.push('today');
+    if (day) cls.push('sel');
+    const dots = day ? PERIODS.filter(p => day.periods[p.id]).map(p => `<i style="background:${p.color}"></i>`).join('') : '';
+    h += `<button class="${cls.join(' ')}" data-iso="${iso}" title="${esc(fmtDay(iso))}">${d.getDate()}${dots?`<span class="dots">${dots}</span>`:''}</button>`;
+  }
+  $('#cal').innerHTML = h;
+}
+$('#cal').addEventListener('click', e => {
+  const b = e.target.closest('[data-iso]'); if (!b) return;
+  const iso = b.dataset.iso; const e2 = ev();
+  if (e2.days[iso]){
+    const hasContent = Object.values(e2.days[iso].periods).some(p => p.options.some(o => o.title || o.places.length));
+    if (hasContent && !confirm(`Tirar ${fmtDay(iso)} do evento? As opções desse dia serão apagadas.`)) return;
+    delete e2.days[iso];
+  } else {
+    e2.days[iso] = {periods:{}};
+  }
+  save(); renderCal(); renderTree(); renderRoute();
+});
+
+/* ---------- tree ---------- */
+function renderTree(){
+  const e = ev(); const isos = Object.keys(e.days).sort();
+  if (!isos.length){
+    $('#tree').innerHTML = `<div class="empty"><div class="big">🗓️</div><p><b>Nenhum dia escolhido ainda.</b></p><p>Selecione no calendário os dias do evento. Para cada dia você escolhe manhã, tarde ou noite, o que fazer e as sugestões de lugares para comparar.</p></div>`;
+    return;
+  }
+  $('#tree').innerHTML = isos.map(iso => renderDay(iso, e.days[iso])).join('');
+}
+function renderDay(iso, day){
+  const collapsed = state.collapsed?.[ev().id+iso];
+  const chips = PERIODS.map(p => `<button class="chip ${p.id} ${day.periods[p.id]?'on':''}" data-act="togglePeriod" data-iso="${iso}" data-pid="${p.id}">${p.icon} ${p.label}</button>`).join('');
+  const active = PERIODS.filter(p => day.periods[p.id]);
+  const body = active.length ? active.map(p => renderPeriod(iso, p, day.periods[p.id])).join('')
+    : `<p class="muted tiny" style="margin:0">Escolha acima se vai ser de manhã, tarde e/ou noite.</p>`;
+  return `<article class="day ${collapsed?'collapsed':''}">
+    <div class="dhead">
+      <div class="t"><button class="caret" data-act="collapse" data-iso="${iso}" aria-label="Recolher">▼</button>${esc(fmtDay(iso))}</div>
+      <div class="chips">${chips}</div>
+      <button class="ghost small danger" data-act="removeDay" data-iso="${iso}" title="Tirar dia">✕</button>
+    </div>
+    <div class="dbody">${body}</div>
+  </article>`;
+}
+function renderPeriod(iso, p, per){
+  const opts = per.options.map(o => renderOption(iso, p, o)).join('');
+  return `<div class="period" style="--c:${p.color}">
+    <div class="phead"><b>${p.icon} ${p.label}</b><span class="muted tiny">${per.options.length} ${per.options.length===1?'opção':'opções'}</span></div>
+    <div class="opts">${opts}
+      <div><button class="small" data-act="addOption" data-iso="${iso}" data-pid="${p.id}">+ Opção do que fazer</button></div>
+    </div>
+  </div>`;
+}
+function renderOption(iso, p, o){
+  const k = `data-iso="${iso}" data-pid="${p.id}" data-oid="${o.id}"`;
+  const places = o.places.map(pl => renderPlace(iso, p, o, pl)).join('');
+  return `<div class="opt ${o.chosen?'chosen':''}">
+    <div class="ohead">
+      <input class="title" value="${esc(o.title)}" placeholder="O que fazer? Ex.: Jantar, Museu, Show…" data-field="title" ${k}>
+      <button class="small" data-act="nearest" ${k} title="Comparar distâncias dos locais desta opção">🧭 Mais perto</button>
+      <button class="small ${o.chosen?'primary':''}" data-act="chooseOption" ${k} title="Marcar como decidida">${o.chosen?'✓ Decidido':'Decidir'}</button>
+      <button class="ghost small danger" data-act="removeOption" ${k} title="Excluir opção">🗑️</button>
+    </div>
+    <div class="places">${places}
+      <button class="addplace" data-act="addPlace" ${k}>+ Sugestão de local</button>
+    </div>
+  </div>`;
+}
+function renderPlace(iso, p, o, pl){
+  const k = `data-iso="${iso}" data-pid="${p.id}" data-oid="${o.id}" data-plid="${pl.id}"`;
+  const stars = [1,2,3,4,5].map(n => `<button class="${(pl.rating||0)>=n?'on':''}" data-act="rate" data-n="${n}" ${k} aria-label="${n} estrelas">★</button>`).join('');
+  const r = routeCache[pl.id];
+  const route = r ? (r.err ? `<span class="route err">${esc(r.err)}</span>` : `<span class="route">${esc(r.text)}</span>`) : '';
+  return `<div class="place ${pl.fav?'fav':''} ${nearestIds.has(pl.id)?'nearest':''}">
+    <input class="name" value="${esc(pl.name)}" placeholder="Nome do local" data-field="name" ${k}>
+    <input value="${esc(pl.address)}" placeholder="Endereço (para a rota)" data-field="address" ${k}>
+    <div class="row">
+      <input value="${esc(pl.price)}" placeholder="Preço" data-field="price" ${k}>
+      <input value="${esc(pl.link)}" placeholder="Link / site" data-field="link" ${k}>
+    </div>
+    <textarea placeholder="Notas, prós e contras…" data-field="notes" ${k}>${esc(pl.notes)}</textarea>
+    <div class="acts">
+      <div class="stars">${stars}</div>
+      <span style="flex:1"></span>
+      <span class="links" data-links="${pl.id}">${placeLinks(pl)}</span>
+      <button class="ghost small" data-act="fav" ${k} title="Favorito">${pl.fav?'💚':'🤍'}</button>
+      <button class="ghost small danger" data-act="removePlace" ${k} title="Excluir">✕</button>
+    </div>
+    ${route}
+  </div>`;
+}
+
+function placeLinks(pl){
+  const q = placeQuery(pl);
+  return (pl.link ? `<a class="tiny" href="${esc(/^https?:/i.test(pl.link)?pl.link:'https://'+pl.link)}" target="_blank" rel="noopener">site</a> ` : '') +
+    (q ? `<a class="tiny" href="${esc(mapsSearchUrl(q))}" target="_blank" rel="noopener">mapa</a> <a class="tiny" href="${esc(mapsDirUrl(ev().origin, q, ev().mode))}" target="_blank" rel="noopener">rota</a>` : '');
+}
+$('#tree').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const {act, iso, pid, oid, plid} = b.dataset;
+  const day = ev().days[iso];
+  switch (act){
+    case 'collapse': state.collapsed = state.collapsed || {}; state.collapsed[ev().id+iso] = !state.collapsed[ev().id+iso]; break;
+    case 'removeDay':
+      if (!confirm(`Tirar ${fmtDay(iso)} do evento?`)) return;
+      delete ev().days[iso]; break;
+    case 'togglePeriod':
+      if (day.periods[pid]){
+        const has = day.periods[pid].options.some(o => o.title || o.places.length);
+        if (has && !confirm('Remover esse período e as opções dele?')) return;
+        delete day.periods[pid];
+      } else day.periods[pid] = {options:[{id:uid(), title:'', chosen:false, places:[]}]};
+      break;
+    case 'addOption': day.periods[pid].options.push({id:uid(), title:'', chosen:false, places:[]}); break;
+    case 'removeOption': {
+      const o = findOption(iso,pid,oid);
+      if ((o.title || o.places.length) && !confirm('Excluir essa opção e os locais dela?')) return;
+      day.periods[pid].options = day.periods[pid].options.filter(x => x.id !== oid); break;
+    }
+    case 'chooseOption': { const o = findOption(iso,pid,oid); o.chosen = !o.chosen; break; }
+    case 'addPlace': findOption(iso,pid,oid).places.push({id:uid(), name:'', address:'', price:'', link:'', notes:'', rating:0, fav:false}); break;
+    case 'removePlace': { const o = findOption(iso,pid,oid); o.places = o.places.filter(x => x.id !== plid); break; }
+    case 'fav': { const pl = findPlace(iso,pid,oid,plid); pl.fav = !pl.fav; break; }
+    case 'rate': { const pl = findPlace(iso,pid,oid,plid); const n = +b.dataset.n; pl.rating = pl.rating === n ? 0 : n; break; }
+    case 'nearest': {
+      const o = findOption(iso,pid,oid);
+      const ids = o.places.filter(pl => placeQuery(pl)).map(pl => pl.id);
+      if (ids.length === 0){ toast('Adicione locais com nome ou endereço primeiro'); return; }
+      selectedDest = new Set(ids); $('#extraDest').value = '';
+      const per = PERIODS.find(x => x.id===pid);
+      renderRoute(); calculate({iso, hour: per.hour});
+      if (window.innerWidth < 900) $('#routeCard').scrollIntoView({behavior:'smooth'});
+      return;
+    }
+    default: return;
+  }
+  save(); renderTree(); renderCal(); if (['addPlace','removePlace','removeOption','togglePeriod','removeDay'].includes(act)) renderRoute();
+  if (act === 'addPlace'){ const o = findOption(iso,pid,oid); const el = document.querySelector(`[data-plid="${o.places.at(-1).id}"][data-field="name"]`); if (el) el.focus(); }
+  if (act === 'addOption'){ const o = day.periods[pid].options.at(-1); const el = document.querySelector(`[data-oid="${o.id}"][data-field="title"]`); if (el) el.focus(); }
+});
+$('#tree').addEventListener('input', e => {
+  const t = e.target; const f = t.dataset.field; if (!f) return;
+  const {iso, pid, oid, plid} = t.dataset;
+  const obj = plid ? findPlace(iso,pid,oid,plid) : findOption(iso,pid,oid);
+  if (!obj) return;
+  obj[f] = t.value; save();
+  if (plid && (f === 'address' || f === 'name')) delete routeCache[plid];
+});
+$('#tree').addEventListener('change', e => {
+  const f = e.target.dataset.field;
+  if (!['name','address','title','link'].includes(f)) return;
+  renderRoute();
+  const {iso, pid, oid, plid} = e.target.dataset;
+  if (plid){
+    const pl = findPlace(iso,pid,oid,plid); const el = document.querySelector(`[data-links="${plid}"]`);
+    if (pl && el) el.innerHTML = placeLinks(pl);
+    if (f === 'address' || f === 'name'){ const r = el?.closest('.place')?.querySelector('.route'); if (r) r.remove(); }
+  }
+});
+function renderTreeKeepFocus(){
+  const a = document.activeElement; const sel = a && a.dataset && a.dataset.field ? {f:a.dataset.field, plid:a.dataset.plid, oid:a.dataset.oid} : null;
+  renderTree();
+  if (sel){
+    const q = sel.plid ? `[data-plid="${sel.plid}"][data-field="${sel.f}"]` : `[data-oid="${sel.oid}"][data-field="${sel.f}"]:not([data-plid])`;
+    const el = document.querySelector(q); if (el) el.focus();
+  }
+}
+
+/* ---------- route calculator ---------- */
+function renderRoute(){
+  const e = ev();
+  $('#origin').value = e.origin || '';
+  [...$('#modes').children].forEach(b => b.classList.toggle('on', b.dataset.mode === e.mode));
+  const places = allPlaces();
+  if (!places.length){
+    $('#destList').innerHTML = `<span class="muted tiny" style="padding:4px">Os locais que você adicionar nas opções aparecem aqui.</span>`;
+  } else {
+    let h = ''; let lastGrp = '';
+    for (const x of places){
+      const grp = `${fmtShort(x.iso)} · ${x.period.label}${x.option.title ? ' · '+x.option.title : ''}`;
+      if (grp !== lastGrp){ h += `<div class="grp">${esc(grp)}</div>`; lastGrp = grp; }
+      const checked = !selectedDest || selectedDest.has(x.place.id);
+      h += `<label><input type="checkbox" data-plid="${x.place.id}" ${checked?'checked':''}><span>${esc(x.place.name || x.place.address)}</span></label>`;
+    }
+    $('#destList').innerHTML = h;
+  }
+  $('#noKeyHint').classList.toggle('hidden', !!settings.apiKey);
+}
+$('#origin').addEventListener('input', e => { ev().origin = e.target.value; save(); });
+$('#origin').addEventListener('change', () => { routeCache = {}; nearestIds = new Set(); refreshLinks(); });
+function refreshLinks(){
+  document.querySelectorAll('.place .route').forEach(r => r.remove());
+  document.querySelectorAll('.place.nearest').forEach(r => r.classList.remove('nearest'));
+  for (const x of allPlaces()){ const el = document.querySelector(`[data-links="${x.place.id}"]`); if (el) el.innerHTML = placeLinks(x.place); }
+}
+$('#modes').addEventListener('click', e => {
+  const b = e.target.closest('[data-mode]'); if (!b) return;
+  ev().mode = b.dataset.mode; save(); routeCache = {}; nearestIds = new Set(); renderRoute(); renderTree(); $('#results').innerHTML = '';
+});
+$('#destList').addEventListener('change', e => {
+  const ids = [...$('#destList').querySelectorAll('input[type=checkbox]')].filter(c => c.checked).map(c => c.dataset.plid);
+  selectedDest = new Set(ids);
+});
+$('#geoBtn').onclick = () => {
+  if (!navigator.geolocation){ toast('Navegador sem localização'); return; }
+  toast('Buscando sua localização…');
+  navigator.geolocation.getCurrentPosition(
+    pos => { ev().origin = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`; save(); routeCache={}; renderRoute(); renderTree(); toast('Localização definida'); },
+    () => toast('Não consegui pegar a localização'), {enableHighAccuracy:true, timeout:10000});
+};
+$('#calcBtn').onclick = () => calculate();
+
+function waypoint(q){
+  const m = q.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+  return m ? {waypoint:{location:{latLng:{latitude:+m[1], longitude:+m[2]}}}} : {waypoint:{address:q}};
+}
+function fmtDur(sec){
+  const m = Math.round(sec/60);
+  if (m < 60) return `${m} min`;
+  return `${Math.floor(m/60)} h ${pad(m%60)}`;
+}
+const fmtDist = m => m < 1000 ? `${m} m` : `${(m/1000).toFixed(1).replace('.',',')} km`;
+
+async function calculate(ctx){
+  const e = ev();
+  const origin = (e.origin || '').trim();
+  const box = $('#results');
+  if (!origin){ box.innerHTML = `<p class="tiny" style="color:var(--danger);margin:0">Preencha de onde vocês vão sair.</p>`; $('#origin').focus(); return; }
+  const places = allPlaces().filter(x => !selectedDest || selectedDest.has(x.place.id));
+  const extras = $('#extraDest').value.split('\n').map(s => s.trim()).filter(Boolean);
+  const dests = [
+    ...places.map(x => ({id:x.place.id, name:x.place.name || x.place.address, q:placeQuery(x.place)})),
+    ...extras.map((q,i) => ({id:'extra'+i, name:q, q})),
+  ];
+  if (!dests.length){ box.innerHTML = `<p class="tiny muted" style="margin:0">Escolha pelo menos um destino.</p>`; return; }
+
+  if (!settings.apiKey){
+    box.innerHTML = dests.map(d => `<div class="res"><span class="n">${esc(d.name)}</span><a class="v" href="${esc(mapsDirUrl(origin, d.q, e.mode))}" target="_blank" rel="noopener">abrir rota ↗</a></div>`).join('')
+      + `<p class="tiny muted" style="margin:4px 0 0">Configure a chave do Google Maps em ⚙️ para comparar o tempo automaticamente.</p>`;
+    return;
+  }
+
+  box.innerHTML = `<p class="tiny muted" style="margin:0">Calculando…</p>`;
+  const body = {
+    origins: [waypoint(origin)],
+    destinations: dests.map(d => waypoint(d.q)),
+    travelMode: e.mode,
+    languageCode: 'pt-BR', units: 'METRIC',
+  };
+  if (e.mode === 'DRIVE') body.routingPreference = 'TRAFFIC_AWARE';
+  // usar o horário do período (se for no futuro) para transporte público / trânsito
+  if (ctx && ctx.iso && (e.mode === 'TRANSIT' || e.mode === 'DRIVE')){
+    const dt = parseIso(ctx.iso); dt.setHours(ctx.hour,0,0,0);
+    if (dt > new Date()) body.departureTime = dt.toISOString();
+  }
+  try {
+    const res = await fetch('https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Goog-Api-Key':settings.apiKey,
+        'X-Goog-FieldMask':'originIndex,destinationIndex,duration,distanceMeters,status,condition'},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error?.message || `Erro ${res.status}`);
+    const rows = Array.isArray(data) ? data : [data];
+    const out = dests.map(d => ({...d}));
+    for (const r of rows){
+      const d = out[r.destinationIndex ?? 0]; if (!d) continue;
+      if (r.condition === 'ROUTE_EXISTS' && r.duration){
+        d.seconds = parseInt(r.duration, 10); d.meters = r.distanceMeters || 0;
+      } else d.err = r.status?.message || 'Sem rota';
+    }
+    const ok = out.filter(d => d.seconds != null).sort((a,b) => a.seconds - b.seconds);
+    const bad = out.filter(d => d.seconds == null);
+    const best = ok[0];
+    for (const d of out){
+      if (d.id.startsWith('extra')) continue;
+      routeCache[d.id] = d.seconds != null ? {text:`${modeIcon(e.mode)} ${fmtDur(d.seconds)} · ${fmtDist(d.meters)}`} : {err: d.err === 'Sem rota' ? 'Sem rota encontrada' : d.err};
+    }
+    // mais perto: por grupo de opção quando vier do botão da opção; senão o melhor geral
+    nearestIds = new Set(best && !best.id.startsWith('extra') ? [best.id] : []);
+    box.innerHTML = [...ok, ...bad].map(d => `<div class="res ${d===best?'best':''}">
+        <span><span class="n">${d===best?'🏆 ':''}${esc(d.name)}</span>${d.seconds!=null?`<br><span class="tiny muted">${fmtDist(d.meters)}</span>`:''}</span>
+        <span class="v">${d.seconds!=null?`<b>${fmtDur(d.seconds)}</b>`:`<span class="tiny" style="color:var(--danger)">${esc(d.err)}</span>`}<br>
+        <a class="tiny" href="${esc(mapsDirUrl(origin, d.q, e.mode))}" target="_blank" rel="noopener">abrir ↗</a></span>
+      </div>`).join('') + (body.departureTime ? `<p class="tiny muted" style="margin:2px 0 0">Saída considerada: ${new Date(body.departureTime).toLocaleString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</p>` : '');
+    renderTreeKeepFocus();
+  } catch (err){
+    box.innerHTML = `<p class="tiny" style="color:var(--danger);margin:0">Não deu para calcular: ${esc(err.message)}</p>
+      <p class="tiny muted" style="margin:4px 0 0">Confira se a chave está certa e se a Routes API está ativada no Google Cloud.</p>`;
+  }
+}
+const modeIcon = m => ({TRANSIT:'🚇', WALK:'🚶', DRIVE:'🚗'}[m]);
+
+/* ---------- boot ---------- */
+function renderAll(){ renderHeader(); renderCal(); renderTree(); renderRoute(); $('#results').innerHTML=''; }
+renderAll();
+})();
+</script>
+</body>
+</html>
